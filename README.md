@@ -1,99 +1,112 @@
-# 🚤 6can_usv_project
+[한국어](README.md) | [English](README_EN.md)
 
-ROS 2 Jazzy 기반 USV 프로젝트. 토픽 이름/타입은 아래 **인터페이스 계약**(1항)에 고정되어
-있고, 내부 구현은 자유롭게 바꿔도 됩니다. `TODO(B1 담당자):` / `TODO(B2 담당자):` /
-`TODO(GCS 담당자):` 로 표시된 부분이 남은 작업입니다.
+# 🌊 6can
+### by Team Eco Bridge AI
 
-```bash
-grep -rn "TODO(" usv_ws/src
-```
+> **"우리 동네 호수를 지키는 작은 눈"**
+> AI 무인수상정(USV)으로 지역 수질을 실시간으로 관찰하고, 스스로 반응하는 환경 모니터링 시스템
+
+6can은 인천 지역사회의 수질 환경 문제를 해결하기 위해 팀 **Eco Bridge AI**가 진행한
+PBL(Problem-Based Learning) 기반 사회공헌 프로젝트입니다. 무인수상정(USV)이 수면을
+직접 순찰하며 수질(탁도·pH·용존산소·수온)을 실시간으로 측정하고, 측정값에 따라
+정화 펌프를 제어하도록 설계했습니다. 수질과 위치 데이터는 웹 대시보드에 표시됩니다.
+
+## 📷 활동 사진 및 시연 영상
+
+인천 센트럴파크에서 띄운 수상정, 보트 모습, 야간 LED 점등 모습, 지역사회 의견 수집 사진입니다. 사진을 누르면 원본을 볼 수 있습니다.
+
+| 인천 센트럴파크에서 띄운 수상정 | 6can 보트 이미지 | 야간 LED 점등 모습 | 공원·호수에 관한 지역사회 의견판 |
+|---|---|---|---|
+| [![인천 센트럴파크 수면에 떠 있는 파란색 수상정](media/usv-on-water.png)](media/usv-on-water.png) | [![파란색 6can 보트의 모습](media/usv-boat.png)](media/usv-boat.png) | [![야간에 초록색 LED를 점등한 6can 보트](media/usv-night-led.jpg)](media/usv-night-led.jpg) | [![공원과 호수에 관한 의견이 붙은 게시판](media/community-feedback-board.png)](media/community-feedback-board.png) |
+
+**시연 영상:** [인천 센트럴파크에서 수상정이 물을 분사하는 모습 보기 (MP4)](media/usv-water-spray-demo.mp4)
 
 ---
 
-## ⚙️ 0. 시스템 요구사항
+## 📌 추진 배경 및 문제 정의
 
-- ROS 2 Jazzy, 세 보드 모두 같은 `ROS_DOMAIN_ID`
-- GCS = Raspberry Pi(네이티브), B1/B2 = Arduino UNO Q 2대(Docker 필수, `--privileged -v /dev:/dev`)
-- **범위 제외**: `watchdog_node`/heartbeat 패키지, `/cmd_vel_safe`(→ 추진기는 `/cmd_vel` 직접 구독)
-- `/gps/satellites`, `/gps/status`는 발행은 하되 GCS는 구독 안 함 (진단용)
-- Arduino 스케치(`.ino`) 필요 여부: **필요**(water_quality/gps, sketch 완료) · **불필요**(camera, usv_gcs 전체) · **미정**(B2 추진기/펌프/LED — 하드웨어 미확정)
+프로젝트는 송도 센트럴파크 호수의 녹조와 부유물 관리 문제를 주제 선정 계기로 삼았습니다.
+넓은 수면을 이동하며 수질과 위치를 확인하고, 필요할 때 분수 장치를 작동시키는 방안을 구상했습니다.
+
+인천 지역의 하천·호수는 다음과 같은 구조적인 관리 한계를 안고 있습니다.
+
+| 기존 관리 방식의 한계 | 내용 |
+|---|---|
+| **낮은 측정 빈도** | 사람이 직접 현장에 나가 정기적으로 샘플을 채취·측정 — 측정 주기 사이의 수질 이상을 놓치기 쉬움 |
+| **높은 운영 비용** | 정기 점검마다 인력·출동 비용이 반복적으로 발생 |
+| **접근성 사각지대** | 배·선박 없이 접근하기 어려운 구역은 관리 빈도가 더 낮아짐 |
+| **시민 체감도 부족** | 수질 데이터가 공개되지 않거나 이해하기 어려운 형태로만 존재해, 환경 문제에 대한 시민 관심으로 이어지기 어려움 |
+
+6can은 이 문제를 "사람이 주기적으로 나가서 재는" 방식에서 "무인선이 상시 관찰하고,
+그 결과를 누구나 볼 수 있게 보여주는" 방식으로 바꾸는 것을 목표로 합니다.
 
 ---
 
-## 🗺️ 1. 아키텍처
+## 🎯 핵심 목표
 
-| 보드 | 패키지 | 담당 | 실행 |
+- 🌐 **실시간 수질 모니터링** — 탁도, pH, 용존산소, 수온을 무인선이 상시 측정
+- 🤖 **자동 반응형 정화** — 측정된 수질 등급에 따라 정화 펌프를 제어하는 기능을 목표로 함
+- 🕹️ **원격 조종 지원** — 필요 시 조이스틱으로 무인선을 직접 조종 가능
+- 📊 **시민 친화적 시각화** — 웹 대시보드에서 수질 상태와 GPS 미니맵을 확인
+- 💸 **저비용 오픈 하드웨어 기반** — 범용 SBC(Arduino UNO Q)·오픈소스 소프트웨어(ROS 2)로 구현해 재현·확장이 쉬운 구조
+
+---
+
+## ⚠️ 작동 특이사항
+
+- 🚤 **배 이동** — 게임 상태와 무관하게 조이스틱으로 항상 조종 가능
+- 🔒 **펌프 · 자동/수동 전환 · LED** — 대시보드에서 START를 눌러 게임이 진행 중일 때만 동작 (메인·엔딩 화면에서는 무시됨)
+- 🔄 **초기화** — 게임이 시작되거나 끝날 때마다 자동모드는 수동으로, LED는 꺼진 상태로 리셋
+
+---
+
+## 🛠 시스템 아키텍처 및 파트별 역할
+
+6can은 무인선에 탑재되는 **HW(하드웨어 제어) 보드 2대**와, 육상에서 관제하는
+**SW/GUI(모니터링·조종) 1대**로 구성됩니다. 보드 간 통신은 ROS 2(DDS)로, 사람이 보는
+화면은 웹 브라우저로 분리했습니다.
+
+| 파트 | 보드 | 역할 | 핵심 기술 스택 |
 |---|---|---|---|
-| B1 (UNO Q) | `usv_sensors` + `camera_streaming` | 수질·GPS·전류·카메라 | Docker, 컨테이너 2개 — `./start_b1.sh` |
-| B2 (UNO Q) | `usv_actuators` | 추진기·펌프·LED | Docker — `./start_actuators.sh` |
-| GCS (Raspberry Pi) | `usv_gcs` | GUI·조종 | 네이티브 |
+| 🔧 **HW — 센싱/영상/정화** | B1 (Arduino UNO Q) | 수질·GPS 센서, 수면/수중 카메라, 펌프·LED가 연결된 보드 | ROS 2 Jazzy(Docker), MCU RPC, OpenCV(V4L2), MJPEG |
+| 🔧 **HW — 추진** | B2 (Arduino UNO Q) | 추진기만 연결된 별도 보드 | ROS 2 Jazzy(Docker), PWM 모터 드라이버, MCU RPC |
+| 💻 **SW/GUI — 관제** | GCS (Raspberry Pi) | 조이스틱 입력 → 조종 명령 변환, 센서/영상 데이터 수신 후 웹 대시보드로 시각화 | ROS 2(네이티브), Python(Flask), HTML5 Canvas, HTTP 폴링·MJPEG 스트리밍 |
 
-`camera_streaming`이 `usv_sensors`와 별도 컨테이너인 이유: `cv_bridge`/`web_video_server`가
-B1의 작은 디스크에서 빌드를 실패시켜서 `opencv-python-headless` + 자체 HTTP 서버로 따로
-만들었습니다 (상세: `CAMERA_STREAMING.md`).
+**통신 구조**: 보드 사이(B1·B2·GCS)는 ROS 2 DDS 기반 발행/구독(pub-sub)으로 연결되어
+있고, GCS는 수신한 최신 상태를 자체 웹 서버(Flask)가 REST 엔드포인트(`/api/state`)로
+변환해 브라우저가 200ms 간격으로 폴링합니다. 웹 보트 위치는 `/cmd_vel`에 따라
+움직이고 GPS는 미니맵에만 사용됩니다. 카메라 영상은 B1이 MJPEG로 직접 송출해
+브라우저가 GCS를 거치지 않고 수신합니다.
 
-```
-usv_ws/
-├── start_b1.sh, install_b1_autostart.sh   # B1의 두 컨테이너를 한 번에
-└── src/
-    ├── usv_sensors/       # B1 — water_quality_node, gps_driver_node, current_sensor_node
-    ├── camera_streaming/  # B1 — camera_node, http_video_server (별도 컨테이너)
-    ├── usv_actuators/     # B2 — thruster_driver_node, actuator_driver_node
-    └── usv_gcs/           # GCS — gui_main_node, joy_to_cmd_node
-```
-
-### 인터페이스 계약
-
-이름/타입을 바꿔야 하면 **이 표부터 고치고 공유**하세요.
-
-| 토픽 | 타입 | 발행 | 구독 |
-|---|---|---|---|
-| `/water_quality/data` | `String`(JSON) | `usv_sensors` | `usv_gcs`, `usv_actuators`(자동 제어) |
-| `/gps/fix` | `NavSatFix` | `usv_sensors` | `usv_gcs` |
-| `/gps/has_fix` | `Bool` | `usv_sensors` | `usv_gcs` |
-| `/gps/satellites`, `/gps/status` | `UInt8`, `String` | `usv_sensors` | 미구독(진단용) |
-| `/camera/surface/image_raw`, `/camera/underwater/image_raw` | `Image` | `camera_streaming`(B1) | `http_video_server`(같은 컨테이너, B1:8000) → GCS(`camera_host`) |
-| `/cmd_vel` | `Twist` | `usv_gcs`(joy_to_cmd_node) | `usv_actuators`, `usv_gcs`(표시) |
-| `/battery/status` | `String`(JSON) | `usv_sensors`(current_sensor_node) | `usv_gcs` |
-| `/actuator/pump_cmd` | `Bool` | `usv_gcs`(joy_to_cmd_node) | `usv_actuators`, `usv_gcs`(표시) |
-| `/actuator/led_cmd` | `ColorRGBA` | `usv_gcs` | `usv_actuators` |
-| `/actuator/auto_mode` | `Bool` | `usv_gcs`(joy_to_cmd_node) | `usv_actuators`, `usv_gcs`(표시) |
-| `/actuator/pump_state` | `Bool` | `usv_actuators`(실제 적용값) | `usv_gcs` |
-| `/actuator/led_state` | `ColorRGBA` | `usv_actuators`(실제 적용값) | `usv_gcs` |
-
-`/battery/status` JSON: `{"thruster1|thruster2|pump_ctrl|sensor_board": {"current_a", "percentage"}}` — 전류 센서 4개 전부 B1에 I2C로 연결.
-
-펌프/LED는 B2가 수질에 따라 자동 제어하되, GCS 수동 명령(`pump_cmd`/`led_cmd`)이 오면 일정
-시간 우선합니다. `pump_state`/`led_state`는 그 실제 적용 결과라 `pump_cmd`/`led_cmd`(명령)와
-다를 수 있습니다.
-
-### 노드 다이어그램
+### 📡 시스템 구조도
 
 ```mermaid
 flowchart LR
   JOY([조이스틱]) -->|/joy| J2C
-  BROWSER([웹 브라우저])
+  BROWSER([웹 브라우저 대시보드])
   DIAG[[진단용 · 미구독]]
 
-  subgraph GCS["usv_gcs · Raspberry Pi"]
+  subgraph GCS["SW/GUI · Raspberry Pi"]
     J2C[joy_to_cmd_node]
     GUI[gui_main_node]
   end
 
-  subgraph B1S["usv_sensors · B1 컨테이너1"]
+  subgraph B1S["HW · B1 — 수질·GPS 센서"]
     WQN[water_quality_node]
     GPSN[gps_driver_node]
-    CSN[current_sensor_node]
   end
 
-  subgraph B1C["camera_streaming · B1 컨테이너2"]
+  subgraph B1C["HW · B1 — 카메라"]
     CAMN[camera_node]
     HVS[http_video_server]
   end
 
-  subgraph B2["usv_actuators · B2"]
+  subgraph B1A["HW · B1 — 센서·카메라·정화"]
+    PUMP[펌프·LED 제어]
+  end
+
+  subgraph B2["HW · B2 — 추진기 전용"]
     THR[thruster_driver_node]
-    ACT[actuator_driver_node]
   end
 
   J2C -->|/cmd_vel| GUI
@@ -102,145 +115,176 @@ flowchart LR
   J2C -->|/actuator/pump_cmd| ACT
   J2C -->|/actuator/auto_mode| GUI
   J2C -->|/actuator/auto_mode| ACT
+  GUI -->|/gcs/game_active| J2C
+  GUI -->|/actuator/led_cmd| ACT
+  ACT -->|/actuator/led_state| GUI
 
   WQN -->|/water_quality/data| GUI
   WQN -->|/water_quality/data| ACT
   GPSN -->|/gps/fix, /gps/has_fix| GUI
   GPSN -.->|/gps/satellites, /gps/status| DIAG
-  CSN -->|/battery/status| GUI
 
   CAMN --> HVS
-  HVS -. "HTTP :8000" .-> BROWSER
-  GUI -. "HTTP :8000" .-> BROWSER
+  HVS -. "HTTP :8000 (MJPEG)" .-> BROWSER
+  GUI -. "HTTP :8000 (대시보드)" .-> BROWSER
 
-  ACT -->|/actuator/pump_state, led_state| GUI
-  GUI -->|/actuator/led_cmd| ACT
+  ACT -->|/actuator/pump_state| GUI
+  ACT -.->|로컬 RPC 대상과 실제 배선 불일치 · 확인 필요| PUMP
 ```
+
+### 🔩 설계 및 실물 하드웨어
+
+![상부 분수 모듈과 구동부를 포함한 수상정 3D 설계 이미지](media/usv-3d-design.jpg)
+
+*수상정 3D 설계 이미지*
+
+![부력 튜브와 추진기, 펌프, 센서 및 앞쪽 수면 카메라와 뒤쪽 수중 카메라의 위치를 표시한 보트 구성 이미지](media/usv-hardware-overview-cameras.png)
 
 ---
 
-## 🛠️ 2. 공통 준비
+## 🧪 제작 및 검증 기록
 
-```bash
-git clone <이 저장소>
-cd usv_project/usv_ws
-```
+| 단계 | 발표자료에 기록된 내용 |
+|---|---|
+| 부품 선정 | 교수 자문을 받아 사용 환경과 부품 호환성을 검토 |
+| 센서 확인 | 표준용액으로 측정 오차를 확인하고 기준값과 비교 |
+| 시스템 통합 | 파트별 작업을 합친 뒤 발생한 호환 문제를 공동 작업으로 점검 |
+| 이동성·현장 테스트 | 인천대학교에서 이동성 테스트, 송도 센트럴파크에서 필드 테스트 진행 |
 
-전체를 빌드하는 보드는 없습니다 — 컨테이너/노드마다 3항의 `--packages-select`로 자기
-패키지만 빌드합니다.
+![송도 센트럴파크 물 위에 띄운 수상정의 필드 테스트 사진](media/central-park-field-test.jpg)
+
+*송도 센트럴파크 필드 테스트 사진*
 
 ---
 
-## 🚀 3. 보드별 빌드 & 실행
+## 💡 기대 효과
 
-> **B1/B2 둘 다: `install_*_autostart.sh`는 사실상 필수입니다.** 배 위에 올라가면 SSH가 항상
-> 되리라는 보장이 없습니다 — 전원이 나갔다 들어오면 사람 개입 없이 코드가 다시 떠야 합니다.
-> 설치 후 **SSH가 살아있을 때 한 번 재부팅해서** 아래로 확인하세요:
-> ```bash
-> sudo reboot
-> # 재부팅 후 다시 접속해서
-> docker ps                              # 컨테이너가 떠 있는지
-> sudo systemctl status usv-sensors.service   # (컨테이너별로 이름 바꿔가며)
-> ```
-> 재부팅 후에도 안 뜨면 배포 전에 잡아야 할 문제입니다 — 현장에서는 못 고칩니다.
+| 효과 | 설명 |
+|---|---|
+| 🌱 **지역사회 수질 환경 개선** | 상시 순찰형 모니터링으로 수질 이상을 조기에 발견하고, 자동 정화 반응으로 대응 시간을 단축 |
+| 💰 **지자체 관리 예산 절감** | 인력 기반 정기 수질 조사의 일부를 무인 자동화로 대체해, 반복적인 출동·인건비 부담을 완화 |
+| 📣 **시민 환경 인식 제고** | 그동안 비공개·비정기적이던 수질 데이터를 실시간 시각화로 누구나 접근 가능하게 제공해, 지역 환경 문제에 대한 관심과 참여를 유도 |
 
-### B1 — `usv_sensors` + `camera_streaming`
+---
+
+# 🔧 기술 문서 (개발·운영 가이드)
+
+> 아래는 실제로 이 저장소를 빌드·실행·튜닝할 때 필요한 최소한의 정보만 담았습니다.
+
+## ⚙️ 파라미터 체크리스트 (가장 먼저 확인)
+
+현장/하드웨어가 바뀌면 코드를 고치지 말고 아래 값들만 조정하세요.
+
+| 파라미터 | 위치 | 기본값 | 언제 바꾸나 |
+|---|---|---|---|
+| `camera_host` | [gcs_params.yaml](src/usv_gcs/config/gcs_params.yaml) 또는 `gcs.launch.py` 인자 | `192.168.0.6` (설정 파일 예시) | B1 보드의 실제 IP로 변경 |
+| `linear_axis` / `angular_axis` / `linear_scale` / `angular_scale` | [gcs_params.yaml](src/usv_gcs/config/gcs_params.yaml) 또는 `gcs.launch.py` 인자 | `1` / `0` / `1.0` / `-0.6` | 전진·후진과 좌·우 회전의 축·감도를 조정할 때 |
+| `pump_button` / `auto_button` | `gcs.launch.py` 인자 | `0`(A) / `1`(B) | 조이스틱 버튼 배치가 다를 때 |
+| `linear_ramp_rate` / `angular_ramp_rate` / `deadzone` | [gcs_params.yaml](src/usv_gcs/config/gcs_params.yaml) 또는 `gcs.launch.py` 인자 | `0.2` / `0.4` / `0.05` | 속도 변화 속도와 조이스틱 미세 입력 무시 범위를 조정할 때 |
+| `GACHA_GAMEPAD_BUTTON_INDEX` | `dashboard_html.py` 상수 | `2`(Y, 추정치) | 실기기로 검증 후 정확한 값으로 |
+| `max_pwm` | `actuators.launch.py` 인자 | `255` | 실제 모터 드라이버 PWM 사양 확정 후 |
+| `bad_below` / `good_above` / `*_manual_hold_s` | `actuators.launch.py` 인자 | `40.0` / `60.0` / `60.0`초 | 실측 수질 범위·자동/수동 우선 시간 조정 시 |
+| `BACK_GAMEPAD_BUTTON_INDEX` | `dashboard_html.py` 상수 | `8`(추정치) | 실기기로 검증 후 정확한 값으로 |
+| `surface_camera_enabled` / `underwater_camera_enabled` | [gcs_params.yaml](src/usv_gcs/config/gcs_params.yaml) | `true` / `true` | 수면/수중 카메라 박스를 각각 켜고 끌 때 |
+| `surface_device` / `underwater_device` | `camera_streaming.launch.py` 인자 | `/dev/video2` / `/dev/video3` | USB 카메라 재연결로 장치 번호가 바뀌었을 때 (`v4l2-ctl --list-devices`로 확인) |
+
+카메라 노드는 V4L2로 장치를 열고, 연결·프레임 수신 실패 시 2초 간격으로 재시도합니다. 한쪽 카메라가 지연되어도 다른 카메라 처리가 멈추지 않도록 각각 별도 실행 흐름으로 처리합니다.
+
+GCS 설정 파일을 바꾼 경우, 파일만 고치고 끝이 아니라
+**`gui_main_node`를 재시작**해야 브라우저에 반영됩니다 (HTML/JS가 프로세스 시작 시
+메모리에 올라가는 구조라서 `--symlink-install`로도 핫리로드는 안 됩니다).
+
+### GCS 기능 ON/OFF 설정
+
+GCS 화면 기능은 [gcs_params.yaml](src/usv_gcs/config/gcs_params.yaml) 한 파일에서 관리합니다.
+값을 수정한 뒤에는 `gui_main_node` 또는 GCS 서비스를 재시작해야 웹 화면에 반영됩니다.
+
+| 설정 | `true`일 때 | `false`일 때 |
+|---|---|---|
+| `surface_camera_enabled` | 수면 카메라 표시 | 수면 카메라 숨김 |
+| `underwater_camera_enabled` | 수중 카메라 표시 | 수중 카메라 숨김 |
+| `gps_minimap_enabled` | GPS 미니맵 표시 | GPS 미니맵 비활성화 |
+| `gps_boat_tracking_enabled` | GPS 좌표로 게임 화면 보트 이동 | 조이스틱 `/cmd_vel`로 게임 화면 보트 이동, GPS는 미니맵에만 표시 |
+| `use_fixed_gps` | `initial_latitude`, `initial_longitude`의 테스트 좌표 사용 | 실제 GPS 토픽 사용 |
+
+`gps_boat_pixels_per_meter`는 GPS 보트 추적을 켰을 때 실제 이동 거리 1 m를 게임 화면에서 몇 픽셀로 보일지 조절합니다.
+
+---
+
+## 🚀 실행 방법
 
 ```bash
-./start_b1.sh                 # 두 컨테이너 순서대로 빌드+실행
-./install_b1_autostart.sh     # 부팅 자동 실행 등록 (위 안내 참고)
-```
+# 1. B1 (센서 + 카메라; 펌프·LED는 B1에 배선됨)
+./start_b1.sh
 
-컨테이너 하나만 재시작: `src/usv_sensors/start_sensors.sh`, `src/camera_streaming/start_camera_streaming.sh` 개별 실행.
+# 2. B2 (추진기 전용)
+cd src/usv_actuators && ./start_actuators.sh
 
-- 카메라 장치 경로: `camera_streaming/launch/camera_streaming.launch.py`의 `surface_device`/`underwater_device` (기본 `/dev/video2`/`3`)
-- `usv_sensors/config/sensors_params.yaml`은 이제 미사용(카메라가 옮겨감)
-
-### B2 — `usv_actuators`
-
-```bash
-cd src/usv_actuators
-./start_actuators.sh
-./install_autostart.sh        # 부팅 자동 실행 등록 (위 안내 참고)
-```
-
-```bash
-ros2 launch usv_actuators actuators.launch.py max_pwm:=180 bad_below:=35.0 good_above:=55.0
-```
-
-### GCS — `usv_gcs` (Docker 불필요)
-
-```bash
+# 3. GCS (관제) — 조이스틱 연결 후
 sudo apt install ros-jazzy-joy
-pip install -r src/usv_gcs/requirements.txt
 colcon build --symlink-install --packages-select usv_gcs
 source install/setup.bash
-ros2 launch usv_gcs gcs.launch.py camera_host:=<B1_IP>
+ros2 launch usv_gcs gcs.launch.py
 ```
 
-`camera_host`는 필수입니다 — 안 넘기면 카메라 스트림이 잘못된 주소를 가리킵니다. 브라우저:
-`http://<GCS IP>:8000`.
+브라우저 주소: `http://<GCS_IP>:8000` (GCS에서 열면 `http://localhost:8000`)
 
-```bash
-ros2 launch usv_gcs gcs.launch.py linear_axis:=1 angular_axis:=0 pump_button:=0 auto_button:=1
+B1/B2는 `install_*_autostart.sh`로 부팅 자동 실행을 등록해두면 이후엔 전원만 넣으면
+됩니다. 개별 보드 빌드/자동 실행 세부 설정, 컨테이너 구성은 `src/<패키지>/` 아래
+`start_*.sh`, `systemd/*.service`를 참고하세요.
+
+추진기 출력 범위(`MAX_DELTA`)와 PWM 반응 속도(`STEP_US`)를 원격에서 조정하거나,
+B2 추진기 노드의 재시작·PWM 로그를 확인하려면
+[B2 추진기 원격 설정 명령어](docs/thruster-remote-operations.md)를 사용하세요.
+
+---
+
+## 🗂️ 보드별 복구 브랜치
+
+실제 보드에서 문제가 생겼을 때 해당 보드 역할의 소스만 기준으로 복구할 수 있도록
+브랜치를 분리해 두었습니다. 각 브랜치는 **그 보드의 Arduino App·Docker·자동 실행
+스크립트 구성을 보존한 복구 스냅샷**이며, 다른 보드 코드와 합쳐서 사용하지 않습니다.
+
+| 브랜치 | 복구 대상 | 포함 역할 |
+|---|---|---|
+| `main` | 통합 기준 코드 | GCS, B1·B2 공통 ROS 2 워크스페이스 |
+| `backup/b1-sensors` | B1 센서 보드 | 수질·GPS 센서 Arduino App 및 센서 컨테이너 구성 |
+| `backup/b1-pump-led` | B1 정화 보드 | 펌프·LED Arduino App 및 정화 제어 구성 |
+| `backup/b1-camera` | B1 카메라 보드 | 수면·수중 카메라 스트리밍 및 자동 실행 구성 |
+
+원본 PR 브랜치(`draft/b1-sensors-board`, `draft/b1-actuators-board`,
+`draft/b1-camera-board`)도 삭제하지 않고 그대로 유지합니다. `backup/*`는 해당 원본을
+쉽게 찾고 복구하기 위한 역할별 이름입니다.
+
+---
+
+## 🕹️ 조이스틱 구성
+
+하나의 컨트롤러가 **① 실제 보트 조종(ROS)** 과 **② 웹 대시보드 미니 모니터링 화면
+조작(브라우저)** 을 처리합니다. 이동(전진/후진/회전)은 웹 대시보드 상태와 무관하게
+항상 되지만, **펌프·자동/수동 전환·LED는 대시보드에서 START를 눌러 게임이 진행 중일
+때만** 실제로 동작합니다 (메인 화면·엔딩 화면에서는 버튼을 눌러도 무시됨). 게임이
+시작되거나 끝나는 순간마다 자동모드는 수동으로, LED는 꺼진 상태로 초기화됩니다.
+
+| 구분 | 조작 | 동작 |
+|---|---|---|
+| 보트 조종 (ROS `/joy`) | 왼쪽 스틱 좌/우 · 상/하 | 좌우 회전 · 전진/후진 (`/cmd_vel`) — 게임 상태 무관, 항상 동작 |
+| 보트 조종 (ROS `/joy`) | A 버튼 | 펌프 on/off 토글 (게임 진행 중일 때만) |
+| 보트 조종 (ROS `/joy`) | B 버튼 | 자동/수동 제어 모드 토글 (게임 진행 중일 때만) |
+| 웹 화면 (브라우저 Gamepad API) | Start 버튼 | 대시보드 화면 시작 |
+| 웹 화면 (브라우저 Gamepad API) | X 버튼 | LED on/off 토글 (게임 진행 중일 때만) |
+| 웹 화면 (브라우저 Gamepad API) | Y 버튼 | 화면 내 상호작용(뽑기) 실행 |
+| 웹 화면 (브라우저 Gamepad API) | Back 버튼 | 초기 화면으로 복귀 |
+
+버튼 인덱스를 실기기로 확인하려면 브라우저 콘솔(F12)에서:
+```js
+setInterval(() => console.log(navigator.getGamepads()[0]?.buttons.map((b,i)=>b.pressed?i:null).filter(v=>v!==null)), 300)
 ```
 
 ---
 
-## ✅ 4. 파트별 체크리스트
+## 📎 참고
 
-토픽 이름/타입(1항)만 유지하면 내부 구현은 자유입니다.
-
-### B1 — `usv_sensors`
-
-- [x] `water_quality_node`, `gps_driver_node` — 포팅 완료, 수정 불필요
-- [x] `current_sensor_node` — 코드 완료
-- [ ] **하드웨어 미확정**: 전류 센서 칩/I2C 주소, `percentage` 환산식 → `sketch.ino`에 반영 필요 (`grep -n "TODO(B1" *.py`)
-- 확인: `ros2 topic echo /water_quality/data`, `/gps/status`, `/battery/status`
-
-### B1 — `camera_streaming`
-
-- [x] `camera_node`, `http_video_server` — 코드 완료, 합성 프레임으로 파이프라인 검증됨
-- [ ] 실제 USB 카메라 미연결 (`CAMERA_STREAMING.md` 참고)
-- 확인: `curl http://<B1 IP>:8000/`, `ros2 topic echo /camera/surface/image_raw --once`
-
-### B2 — `usv_actuators`
-
-- [x] `/cmd_vel` PWM 믹싱, 수질 자동 제어(`water_policy.py`), 수동/자동 우선순위, 상태 발행 — 코드 완료
-- [ ] **하드웨어 미확정 — 가장 미완성**: Arduino 스케치 자체가 없음. `set_thruster_pwm`, `set_pump`, `set_actuator_led` RPC 핸들러 구현 필요 (`grep -n "TODO(B2" *.py`)
-- [ ] `app.yaml`을 실제 App Lab 앱 이름에 맞춰 확인
-- 확인: `ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}}"`
-
-### GCS — `usv_gcs`
-
-- [x] `joy_to_cmd_node`, `gui_main_node`, 대시보드 — 배선/기능 완료
-- [ ] 실제 조이스틱 축/버튼 번호 확인 → `linear_axis`/`angular_axis`/`pump_button`/`auto_button` 인자로 반영 (`ros2 topic echo /joy`)
-- [ ] `BATTERY_WARNING_PCT`(20%) — 배터리 사양 확정되면 조정
-- [ ] (선택) 미니맵용 `google_maps_api_key` — 안 넣으면 정적 이미지로 폴백
-- 확인: 대시보드(`http://<GCS IP>:8000`)에서 실시간 값·펌프/LED 상태·카메라 스트림 확인
-
-### 알려진 미정리 항목 (동작엔 지장 없음)
-
-- `usv_sensors/camera_node.py`, `config/sensors_params.yaml` — 미사용 코드(카메라가 `camera_streaming`으로 이동), 팀원 작업 충돌 방지로 남겨둠
-- `usv_sensors/Dockerfile`의 `cv_bridge` 의존성 — 위와 같은 이유로 미제거
-
----
-
-## ✅ 5. 설계 결정
-
-- `watchdog_node` 없음, 추진기는 `/cmd_vel` 직접 구독 (0항)
-- `/gps/satellites`/`/gps/status`는 발행만, GCS 미구독 (0항)
-- 커스텀 msg(`usv_interfaces`) 없음 — 전부 표준 타입(`std_msgs`/`sensor_msgs`/`geometry_msgs`)
-
----
-
-## 🐳 6. Docker 참고
-
-| 파일 | 역할 |
-|---|---|
-| `Dockerfile` | `ros:jazzy-ros-base` + pip 의존성 + `colcon build --packages-select <pkg>` |
-| `app.yaml`, `sketch/` (usv_sensors, usv_actuators만) | Arduino App Lab 앱 / MCU 스케치 |
-| `start_*.sh` | 이미지 빌드(최초 1회) → 컨테이너 실행 |
-| `systemd/*.service` + `install_autostart.sh` | 부팅 자동 실행 |
-
-`camera_streaming`은 MCU/Arduino App Lab과 무관합니다 — USB 카메라를 Linux에서 직접 잡으므로 `sketch/`, RouterBridge 대기 단계가 없습니다.
+- 인터페이스 계약(토픽 이름/타입), 보드별 상세 빌드 옵션, Docker/systemd 구성은 각
+  패키지(`src/usv_sensors`, `src/usv_actuators`, `src/camera_streaming`, `src/usv_gcs`)의
+  launch 파일과 스크립트 주석에 정리되어 있습니다.

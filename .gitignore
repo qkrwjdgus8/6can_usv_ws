@@ -5,3 +5,12 @@ __pycache__/
 build/
 install/
 log/
+
+# arduino-app-cli build cache
+src/*/.cache/
+
+# macOS
+.DS_Store
+
+# 시크릿 (API 키 등) - 절대 커밋하지 말 것. src/usv_gcs/config/gcs_secrets.yaml.example 참고
+src/usv_gcs/config/gcs_secrets.yaml
